@@ -13,8 +13,10 @@ import { Doctor } from '../doctors/doctor.entity';
 export class ScheduleSlot {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+  @Column()
+  doctorId: string;
 
-  @ManyToOne(() => Doctor, { eager: true, onDelete: 'CASCADE' })
+  @ManyToOne(() => Doctor, {  onDelete: 'CASCADE' })
   doctor: Doctor;
 
   @Column({ type: 'timestamptz' })

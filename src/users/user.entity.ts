@@ -20,8 +20,8 @@ export class User {
   @Column()
   fullName: string;
 
-  @Column({ nullable: true })
-  phone?: string | null;
+  @Column({type: 'varchar', nullable: true })
+  phone?: string;
 
   @Column({
     type: 'enum',

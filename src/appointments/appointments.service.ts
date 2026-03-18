@@ -43,7 +43,6 @@ export class AppointmentsService {
 
       const slot = await slotRepo.findOne({
         where: { id: dto.slotId },
-        relations: ['doctor'],
         lock: { mode: 'pessimistic_write' },
       });
       if (!slot) {
@@ -54,7 +53,7 @@ export class AppointmentsService {
         throw new ForbiddenException('Slot is already booked');
       }
 
-      if (slot.doctor.id !== dto.doctorId) {
+      if (slot.doctorId !== dto.doctorId) {
         throw new ForbiddenException('Slot does not belong to this doctor');
       }
 
@@ -87,6 +86,7 @@ export class AppointmentsService {
   async getByIdForUser(current: RequestUser, id: string) {
     const appointment = await this.appointmentsRepository.findOne({
       where: { id },
+      relations: ['patient']
     });
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
@@ -124,7 +124,6 @@ export class AppointmentsService {
 
       const appt = await appointmentRepo.findOne({
         where: { id: appointment.id },
-        relations: ['slot'],
         lock: { mode: 'pessimistic_write' },
       });
       if (!appt) {
@@ -136,7 +135,7 @@ export class AppointmentsService {
       await appointmentRepo.save(appt);
 
       const slot = await slotRepo.findOne({
-        where: { id: appt.slot.id },
+        where: { id: appointment.slot.id },
       });
       if (slot) {
         slot.isBooked = false;
