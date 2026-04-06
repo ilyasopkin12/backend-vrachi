@@ -30,6 +30,9 @@ export class User {
   })
   role: UserRole;
 
+  @Column({ type: 'varchar', nullable: true })
+  refreshTokenHash?: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

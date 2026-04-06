@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -37,7 +38,7 @@ export class AuthService {
     });
     await this.usersRepository.save(user);
 
-    const token = await this.signToken(user);
+    const token = await this.signAccessToken(user);
 
     return {
       user: {
@@ -63,22 +64,89 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const token = await this.signToken(user);
+    return this.issueAuthTokens(user);
+  }
 
+  async refreshAccessToken(refreshToken: string) {
+    const payload = await this.verifyRefreshToken(refreshToken);
+    const user = await this.usersRepository.findOne({
+      where: { id: payload.sub },
+    });
+    if (!user || !user.refreshTokenHash) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const isValid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const accessToken = await this.signAccessToken(user);
+    return { accessToken };
+  }
+
+  async logout(userId: string) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    user.refreshTokenHash = null;
+    await this.usersRepository.save(user);
+    return { success: true };
+  }
+
+  async getMe(userId: string) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-      },
-      accessToken: token,
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      role: user.role,
     };
   }
 
-  private async signToken(user: User): Promise<string> {
+  private async issueAuthTokens(user: User) {
+    const accessToken = await this.signAccessToken(user);
+    const refreshToken = await this.signRefreshToken(user);
+    user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    await this.usersRepository.save(user);
+
+    return { accessToken, refreshToken };
+  }
+
+  private async signAccessToken(user: User): Promise<string> {
     const payload = { sub: user.id, email: user.email, role: user.role };
     return this.jwtService.signAsync(payload);
+  }
+
+  private async signRefreshToken(user: User): Promise<string> {
+    const payload = { sub: user.id };
+    const refreshSecret =
+      process.env.JWT_REFRESH_SECRET || 'dev_jwt_refresh_secret';
+    return this.jwtService.signAsync(payload, {
+      secret: refreshSecret,
+      expiresIn: '7d',
+    });
+  }
+
+  private async verifyRefreshToken(refreshToken: string): Promise<{ sub: string }> {
+    const refreshSecret =
+      process.env.JWT_REFRESH_SECRET || 'dev_jwt_refresh_secret';
+    try {
+      return await this.jwtService.verifyAsync<{ sub: string }>(refreshToken, {
+        secret: refreshSecret,
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 }
 
