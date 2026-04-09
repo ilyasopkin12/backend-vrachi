@@ -18,7 +18,10 @@ export class User {
   passwordHash: string;
 
   @Column()
-  fullName: string;
+  name: string;
+
+  @Column()
+  surname: string;
 
   @Column({type: 'varchar', nullable: true })
   phone?: string;

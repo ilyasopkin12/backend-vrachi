@@ -33,7 +33,8 @@ export class AuthService {
     const user = this.usersRepository.create({
       email: dto.email,
       passwordHash,
-      fullName: dto.fullName,
+      name: dto.name,
+      surname: dto.surname,
       phone: dto.phone,
     });
     await this.usersRepository.save(user);
@@ -44,7 +45,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        fullName: user.fullName,
+        name: user.name,
+        surname: user.surname,
         phone: user.phone,
       },
       accessToken: token,
@@ -107,7 +109,8 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      fullName: user.fullName,
+      name: user.name,
+      surname: user.surname,
       phone: user.phone,
       role: user.role,
     };
