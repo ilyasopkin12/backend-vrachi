@@ -72,7 +72,8 @@ export class DoctorsService {
     }
 
     const doctor = this.doctorsRepository.create({
-      fullName: dto.fullName,
+      name: dto.name,
+      surname: dto.surname,
       specialization,
       city: dto.city,
       experienceYears: dto.experienceYears ?? 0,
@@ -98,7 +99,8 @@ export class DoctorsService {
       doctor.specialization = specialization;
     }
 
-    if (dto.fullName !== undefined) doctor.fullName = dto.fullName;
+    if (dto.name !== undefined) doctor.name = dto.name;
+    if (dto.surname !== undefined) doctor.surname = dto.surname
     if (dto.city !== undefined) doctor.city = dto.city;
     if (dto.experienceYears !== undefined)
       doctor.experienceYears = dto.experienceYears;
@@ -110,7 +112,7 @@ export class DoctorsService {
 
   async findAllForAdmin() {
     return this.doctorsRepository.find({
-      order: { fullName: 'ASC' },
+      order: { name: 'ASC' , surname : 'ASC'},
     });
   }
 }

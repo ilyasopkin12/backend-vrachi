@@ -3,7 +3,9 @@ import { IsUUID } from 'class-validator';
 
 export class CreateDoctorDto {
   @IsString()
-  fullName: string;
+  name: string;
+  @IsString()
+  surname: string;
 
   @IsUUID()
   specializationId: string;

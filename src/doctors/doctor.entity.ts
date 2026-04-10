@@ -12,7 +12,10 @@ export class Doctor {
   id: string;
 
   @Column()
-  fullName: string;
+  name: string;
+  
+  @Column()
+  surname: string;
 
   @ManyToOne(
     () => Specialization,
