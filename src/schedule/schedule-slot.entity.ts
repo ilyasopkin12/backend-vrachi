@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Doctor } from '../doctors/doctor.entity';
+import { ConsultationType } from './consultation-type.enum';
 
 @Entity({ name: 'schedule_slots' })
 @Index(['doctor', 'startTime'], { unique: true })
@@ -27,6 +28,13 @@ export class ScheduleSlot {
 
   @Column({ default: false })
   isBooked: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: ConsultationType,
+    default: ConsultationType.IN_PERSON,
+  })
+  consultationType: ConsultationType;
 
   @CreateDateColumn()
   createdAt: Date;

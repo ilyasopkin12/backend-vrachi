@@ -6,6 +6,7 @@ import { QueryDoctorsDto } from './dto/query-doctors.dto';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { Specialization } from './specialization.entity';
+import { DoctorPresence } from './doctor-presence.enum';
 
 @Injectable()
 export class DoctorsService {
@@ -79,6 +80,10 @@ export class DoctorsService {
       experienceYears: dto.experienceYears ?? 0,
       description: dto.description,
       isActive: dto.isActive ?? true,
+      visitCount: 0,
+      clinic: dto.clinic ?? '',
+      cabinet: dto.cabinet ?? '',
+      presence: dto.presence ?? DoctorPresence.OFFLINE,
     });
     return this.doctorsRepository.save(doctor);
   }
@@ -106,6 +111,10 @@ export class DoctorsService {
       doctor.experienceYears = dto.experienceYears;
     if (dto.description !== undefined) doctor.description = dto.description;
     if (dto.isActive !== undefined) doctor.isActive = dto.isActive;
+    if (dto.clinic !== undefined) doctor.clinic = dto.clinic;
+    if (dto.cabinet !== undefined) doctor.cabinet = dto.cabinet;
+    if (dto.visitCount !== undefined) doctor.visitCount = dto.visitCount;
+    if (dto.presence !== undefined) doctor.presence = dto.presence;
 
     return this.doctorsRepository.save(doctor);
   }

@@ -2,9 +2,12 @@ import {
   ArrayMinSize,
   IsArray,
   IsDateString,
+  IsEnum,
+  IsOptional,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ConsultationType } from '../consultation-type.enum';
 
 class SlotDefinitionDto {
   @IsDateString()
@@ -12,6 +15,10 @@ class SlotDefinitionDto {
 
   @IsDateString()
   endTime: string;
+
+  @IsOptional()
+  @IsEnum(ConsultationType)
+  consultationType?: ConsultationType;
 }
 
 export class CreateSlotsDto {

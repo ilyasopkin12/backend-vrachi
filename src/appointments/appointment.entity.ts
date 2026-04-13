@@ -10,6 +10,7 @@ import { User } from '../users/user.entity';
 import { Doctor } from '../doctors/doctor.entity';
 import { ScheduleSlot } from '../schedule/schedule-slot.entity';
 import { AppointmentStatus } from './appointment-status.enum';
+import { ConsultationType } from '../schedule/consultation-type.enum';
 
 @Entity({ name: 'appointments' })
 @Unique(['slot'])
@@ -32,6 +33,13 @@ export class Appointment {
     default: AppointmentStatus.CONFIRMED,
   })
   status: AppointmentStatus;
+
+  @Column({
+    type: 'enum',
+    enum: ConsultationType,
+    default: ConsultationType.IN_PERSON,
+  })
+  consultationType: ConsultationType;
 
   @Column({ type: 'text', nullable: true })
   comment?: string | null;

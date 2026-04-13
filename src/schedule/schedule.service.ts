@@ -9,6 +9,8 @@ import { ScheduleSlot } from './schedule-slot.entity';
 import { Doctor } from '../doctors/doctor.entity';
 import { QuerySlotsDto } from './dto/query-slots.dto';
 import { CreateSlotsDto } from './dto/create-slots.dto';
+import { ConsultationType } from './consultation-type.enum';
+import { DoctorPresence } from '../doctors/doctor-presence.enum';
 
 @Injectable()
 export class ScheduleService {
@@ -68,11 +70,23 @@ export class ScheduleService {
         throw new BadRequestException('Slots must be in the future');
       }
 
+      const consultationType =
+        s.consultationType ?? ConsultationType.IN_PERSON;
+      if (
+        consultationType === ConsultationType.ONLINE &&
+        doctor.presence !== DoctorPresence.ONLINE
+      ) {
+        throw new BadRequestException(
+          'Online slots require doctor presence ONLINE',
+        );
+      }
+
       const slot = new ScheduleSlot();
       slot.doctor = doctor;
       slot.startTime = start;
       slot.endTime = end;
       slot.isBooked = false;
+      slot.consultationType = consultationType;
       return slot;
     });
 

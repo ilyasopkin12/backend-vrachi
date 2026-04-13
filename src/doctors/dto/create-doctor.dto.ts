@@ -1,5 +1,13 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { IsUUID } from 'class-validator';
+import { DoctorPresence } from '../doctor-presence.enum';
 
 export class CreateDoctorDto {
   @IsString()
@@ -25,5 +33,17 @@ export class CreateDoctorDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  clinic?: string;
+
+  @IsOptional()
+  @IsString()
+  cabinet?: string;
+
+  @IsOptional()
+  @IsEnum(DoctorPresence)
+  presence?: DoctorPresence;
 }
 

@@ -36,6 +36,13 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   refreshTokenHash?: string | null;
 
+  /**
+   * Последняя активность на сайте (пинг WebSocket / heartbeat).
+   * «Онлайн» на фронте обычно: now - lastSeenAt < порога (например 1–2 мин).
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSeenAt?: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

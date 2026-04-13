@@ -11,6 +11,8 @@ import { Doctor } from '../doctors/doctor.entity';
 import { User } from '../users/user.entity';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { AppointmentStatus } from './appointment-status.enum';
+import { ConsultationType } from '../schedule/consultation-type.enum';
+import { DoctorPresence } from '../doctors/doctor-presence.enum';
 import { RequestUser } from '../auth/jwt.strategy';
 import { UserRole } from '../users/user-role.enum';
 
@@ -69,6 +71,17 @@ export class AppointmentsService {
         throw new NotFoundException('Doctor not found');
       }
 
+      const consultationType =
+        slot.consultationType ?? ConsultationType.IN_PERSON;
+      if (
+        consultationType === ConsultationType.ONLINE &&
+        doctor.presence !== DoctorPresence.ONLINE
+      ) {
+        throw new ForbiddenException(
+          'Doctor is not available for online consultation',
+        );
+      }
+
       slot.isBooked = true;
       await slotRepo.save(slot);
 
@@ -78,8 +91,11 @@ export class AppointmentsService {
         slot,
         comment: dto.comment,
         status: AppointmentStatus.CONFIRMED,
+        consultationType,
       });
-      return appointmentRepo.save(appointment);
+      const saved = await appointmentRepo.save(appointment);
+      await doctorRepo.increment({ id: doctor.id }, 'visitCount', 1);
+      return saved;
     });
   }
 
@@ -103,7 +119,7 @@ export class AppointmentsService {
   async cancelForUser(current: RequestUser, id: string) {
     const appointment = await this.appointmentsRepository.findOne({
       where: { id },
-      relations: ['slot', 'patient'],
+      relations: ['slot', 'patient', 'doctor'],
     });
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
@@ -121,13 +137,26 @@ export class AppointmentsService {
     await this.dataSource.transaction(async (manager) => {
       const appointmentRepo = manager.getRepository(Appointment);
       const slotRepo = manager.getRepository(ScheduleSlot);
+      const doctorRepo = manager.getRepository(Doctor);
 
       const appt = await appointmentRepo.findOne({
         where: { id: appointment.id },
+        relations: ['doctor'],
         lock: { mode: 'pessimistic_write' },
       });
       if (!appt) {
         throw new NotFoundException('Appointment not found');
+      }
+
+      if (appt.status === AppointmentStatus.CONFIRMED && appt.doctor) {
+        const d = await doctorRepo.findOne({
+          where: { id: appt.doctor.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (d) {
+          d.visitCount = Math.max(0, d.visitCount - 1);
+          await doctorRepo.save(d);
+        }
       }
 
       appt.status = cancelStatus;
