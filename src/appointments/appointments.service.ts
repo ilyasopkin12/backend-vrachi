@@ -42,6 +42,7 @@ export class AppointmentsService {
       const slotRepo = manager.getRepository(ScheduleSlot);
       const doctorRepo = manager.getRepository(Doctor);
       const appointmentRepo = manager.getRepository(Appointment);
+      const userRepo = manager.getRepository(User);
 
       const slot = await slotRepo.findOne({
         where: { id: dto.slotId },
@@ -95,6 +96,8 @@ export class AppointmentsService {
       });
       const saved = await appointmentRepo.save(appointment);
       await doctorRepo.increment({ id: doctor.id }, 'visitCount', 1);
+      await userRepo.increment({ id: patient.id }, 'totalVisits', 1);
+      await userRepo.increment({ id: patient.id }, 'upcomingVisits', 1);
       return saved;
     });
   }
@@ -138,14 +141,30 @@ export class AppointmentsService {
       const appointmentRepo = manager.getRepository(Appointment);
       const slotRepo = manager.getRepository(ScheduleSlot);
       const doctorRepo = manager.getRepository(Doctor);
+      const userRepo = manager.getRepository(User);
 
       const appt = await appointmentRepo.findOne({
         where: { id: appointment.id },
-        relations: ['doctor'],
+        relations: ['doctor', 'patient', 'slot'],
         lock: { mode: 'pessimistic_write' },
       });
       if (!appt) {
         throw new NotFoundException('Appointment not found');
+      }
+
+      const now = new Date();
+      if (appt.status === AppointmentStatus.CONFIRMED && appt.patient) {
+        const u = await userRepo.findOne({
+          where: { id: appt.patient.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (u) {
+          u.totalVisits = Math.max(0, u.totalVisits - 1);
+          if (appt.slot && appt.slot.startTime > now) {
+            u.upcomingVisits = Math.max(0, u.upcomingVisits - 1);
+          }
+          await userRepo.save(u);
+        }
       }
 
       if (appt.status === AppointmentStatus.CONFIRMED && appt.doctor) {

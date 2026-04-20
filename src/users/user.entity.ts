@@ -43,6 +43,14 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   lastSeenAt?: Date | null;
 
+  /** Подтверждённые приёмы (без отменённых): прошедшие и предстоящие со статусом CONFIRMED. */
+  @Column({ type: 'int', default: 0 })
+  totalVisits: number;
+
+  /** Актуальные предстоящие приёмы (CONFIRMED, слот в будущем); при чтении профиля сверяется с БД. */
+  @Column({ type: 'int', default: 0 })
+  upcomingVisits: number;
+
   @CreateDateColumn()
   createdAt: Date;
 }

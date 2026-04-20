@@ -11,7 +11,6 @@ import { DoctorPresence } from './doctor-presence.enum';
 import { User } from '../users/user.entity';
 
 @Entity({ name: 'doctors' })
-@Index('UQ_doctors_userId', ['userId'], { unique: true })
 export class Doctor {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -70,6 +69,7 @@ export class Doctor {
    * Связь с учёткой пользователя (будущий вход врача на сайт).
    * Пока null — присутствие обновляется только по doctorId.
    */
+  @Index('UQ_doctors_userId', { unique: true })
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'userId' })
   user?: User | null;

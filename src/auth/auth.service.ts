@@ -11,12 +11,16 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { Appointment } from '../appointments/appointment.entity';
+import { AppointmentStatus } from '../appointments/appointment-status.enum';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Appointment)
+    private readonly appointmentsRepository: Repository<Appointment>,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -36,6 +40,8 @@ export class AuthService {
       name: dto.name,
       surname: dto.surname,
       phone: dto.phone,
+      totalVisits: 0,
+      upcomingVisits: 0,
     });
     await this.usersRepository.save(user);
 
@@ -48,6 +54,8 @@ export class AuthService {
         name: user.name,
         surname: user.surname,
         phone: user.phone,
+        totalVisits: user.totalVisits,
+        upcomingVisits: user.upcomingVisits,
       },
       accessToken: token,
     };
@@ -106,6 +114,32 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    const now = new Date();
+    const realTotal = await this.appointmentsRepository.count({
+      where: { patient: { id: user.id }, status: AppointmentStatus.CONFIRMED },
+    });
+    const realUpcoming = await this.appointmentsRepository
+      .createQueryBuilder('a')
+      .innerJoin('a.slot', 'slot')
+      .where('a.patientId = :pid', { pid: user.id })
+      .andWhere('a.status = :st', { st: AppointmentStatus.CONFIRMED })
+      .andWhere('slot.startTime > :now', { now })
+      .getCount();
+
+    let dirty = false;
+    if (user.totalVisits !== realTotal) {
+      user.totalVisits = realTotal;
+      dirty = true;
+    }
+    if (user.upcomingVisits !== realUpcoming) {
+      user.upcomingVisits = realUpcoming;
+      dirty = true;
+    }
+    if (dirty) {
+      await this.usersRepository.save(user);
+    }
+
     return {
       id: user.id,
       email: user.email,
@@ -113,6 +147,8 @@ export class AuthService {
       surname: user.surname,
       phone: user.phone,
       role: user.role,
+      totalVisits: user.totalVisits,
+      upcomingVisits: user.upcomingVisits,
     };
   }
 
