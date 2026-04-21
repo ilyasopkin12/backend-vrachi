@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   Min,
 } from 'class-validator';
 import { IsUUID } from 'class-validator';
@@ -45,5 +46,11 @@ export class CreateDoctorDto {
   @IsOptional()
   @IsEnum(DoctorPresence)
   presence?: DoctorPresence;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  ratingStars?: number;
 }
 

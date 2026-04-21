@@ -81,6 +81,7 @@ export class DoctorsService {
       description: dto.description,
       isActive: dto.isActive ?? true,
       visitCount: 0,
+      ratingStars: dto.ratingStars ?? 5,
       clinic: dto.clinic ?? '',
       cabinet: dto.cabinet ?? '',
       presence: dto.presence ?? DoctorPresence.OFFLINE,
@@ -114,6 +115,7 @@ export class DoctorsService {
     if (dto.clinic !== undefined) doctor.clinic = dto.clinic;
     if (dto.cabinet !== undefined) doctor.cabinet = dto.cabinet;
     if (dto.visitCount !== undefined) doctor.visitCount = dto.visitCount;
+    if (dto.ratingStars !== undefined) doctor.ratingStars = dto.ratingStars;
     if (dto.presence !== undefined) doctor.presence = dto.presence;
 
     return this.doctorsRepository.save(doctor);

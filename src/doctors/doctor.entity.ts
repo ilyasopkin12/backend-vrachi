@@ -44,6 +44,10 @@ export class Doctor {
   @Column({ type: 'int', default: 0 })
   visitCount: number;
 
+  /** Рейтинг по шкале 1–5 звёзд. */
+  @Column({ type: 'int', default: 5 })
+  ratingStars: number;
+
   @Column({ type: 'varchar', length: 255, default: '' })
   clinic: string;
 
