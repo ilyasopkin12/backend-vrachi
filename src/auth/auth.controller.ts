@@ -33,9 +33,9 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { accessToken, refreshToken } = await this.authService.login(dto);
+    const { accessToken, refreshToken, user } = await this.authService.login(dto);
     this.setRefreshCookie(res, refreshToken);
-    return { accessToken };
+    return { accessToken, user };
   }
 
   @Post('refresh')

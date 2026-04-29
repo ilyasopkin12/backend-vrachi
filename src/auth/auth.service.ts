@@ -74,7 +74,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.issueAuthTokens(user);
+    const profile = await this.getMe(user.id);
+    const tokens = await this.issueAuthTokens(user);
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: profile,
+    };
   }
 
   async refreshAccessToken(refreshToken: string) {
@@ -155,8 +162,8 @@ export class AuthService {
   private async issueAuthTokens(user: User) {
     const accessToken = await this.signAccessToken(user);
     const refreshToken = await this.signRefreshToken(user);
-    user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-    await this.usersRepository.save(user);
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    await this.usersRepository.update({ id: user.id }, { refreshTokenHash });
 
     return { accessToken, refreshToken };
   }

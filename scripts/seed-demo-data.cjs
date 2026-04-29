@@ -1,12 +1,40 @@
 /**
- * Демо-данные: специализации, 10 пользователей-пациентов, 12 врачей,
- * плюс записи на приём для статистики пациентов (totalVisits / upcomingVisits).
+ * Демо-данные: специализации, 20 пациентов (patient01–20@demo.local), 40 врачей,
+ * у каждого пациента 2–5 записей CONFIRMED со слотами в мае 2026 (UTC).
+ * При каждом запуске старые демо-записи (appointments + слоты) удаляются и создаются заново.
  * Запуск: node scripts/seed-demo-data.cjs
- * Пароль у всех пользователей: Password1!
+ * Пароль у всех демо-пациентов: Password1!
  */
 const { Client } = require('pg');
 const bcrypt = require('bcrypt');
 const { randomUUID } = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
+(function loadEnvFromDotEnv() {
+  try {
+    const p = path.join(__dirname, '..', '.env');
+    if (!fs.existsSync(p)) return;
+    const raw = fs.readFileSync(p, 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const s = line.trim();
+      if (!s || s.startsWith('#')) continue;
+      const eq = s.indexOf('=');
+      if (eq === -1) continue;
+      const key = s.slice(0, eq).trim();
+      let val = s.slice(eq + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[key] === undefined) process.env[key] = val;
+    }
+  } catch (_) {
+    /* ignore */
+  }
+})();
 
 const DB = {
   host: process.env.DB_HOST || 'localhost',
@@ -18,6 +46,9 @@ const DB = {
 
 const USER_PASSWORD = 'Password1!';
 
+/** Май 2026 UTC: все слоты внутри [1 июня не вкл.) */
+const MAY_2026_START_MS = Date.UTC(2026, 4, 1, 6, 0, 0);
+
 const SPECIALIZATION_NAMES = [
   'Терапевт',
   'Кардиолог',
@@ -26,44 +57,86 @@ const SPECIALIZATION_NAMES = [
   'Хирург',
 ];
 
-const PATIENTS = [
-  ['Алексей', 'Смирнов', 'patient01@demo.local', '+79001001001'],
-  ['Екатерина', 'Кузнецова', 'patient02@demo.local', '+79001001002'],
-  ['Никита', 'Попов', 'patient03@demo.local', '+79001001003'],
-  ['Анна', 'Васильева', 'patient04@demo.local', '+79001001004'],
-  ['Михаил', 'Соколов', 'patient05@demo.local', '+79001001005'],
-  ['Дарья', 'Михайлова', 'patient06@demo.local', '+79001001006'],
-  ['Илья', 'Новиков', 'patient07@demo.local', '+79001001007'],
-  ['Полина', 'Федорова', 'patient08@demo.local', '+79001001008'],
-  ['Константин', 'Морозов', 'patient09@demo.local', '+79001001009'],
-  ['Вероника', 'Волкова', 'patient10@demo.local', '+79001001010'],
+const CITIES = [
+  'Москва',
+  'Санкт-Петербург',
+  'Казань',
+  'Новосибирск',
+  'Екатеринбург',
+  'Нижний Новгород',
 ];
 
-/** Последние столбцы: visitCount, ratingStars (1–5). visitCount после сидирования записей пересчитывается из фактических CONFIRMED appointments. */
-const DOCTORS = [
-  ['Иван', 'Петров', 'Терапевт', 'Москва', 14, 'Клиника «Здоровье», каб. 101', '101', 'OFFLINE', 28, 5],
-  ['Мария', 'Сидорова', 'Кардиолог', 'Москва', 11, 'Клиника «Здоровье», каб. 205', '205', 'ONLINE', 45, 4],
-  ['Дмитрий', 'Новиков', 'Кардиолог', 'Казань', 9, 'Медцентр Казань', '12', 'OFFLINE', 12, 4],
-  ['Ольга', 'Морозова', 'Невролог', 'Москва', 11, 'Невроцентр', '3', 'ONLINE', 63, 5],
-  ['Сергей', 'Лебедев', 'Терапевт', 'Новосибирск', 7, 'Поликлиника №4', '18', 'OFFLINE', 7, 3],
-  ['Анна', 'Фёдорова', 'Офтальмолог', 'Москва', 14, 'Глазная клиника', '7', 'ONLINE', 51, 5],
-  ['Павел', 'Орлов', 'Хирург', 'Санкт-Петербург', 16, 'Городская больница', '402', 'OFFLINE', 34, 4],
-  ['Татьяна', 'Романова', 'Терапевт', 'Екатеринбург', 8, 'УралМед', '21', 'OFFLINE', 19, 4],
-  ['Андрей', 'Зайцев', 'Невролог', 'Казань', 13, 'Невро+', '5', 'ONLINE', 41, 5],
-  ['Елена', 'Белова', 'Офтальмолог', 'Новосибирск', 6, 'ОптикаМед', '2', 'OFFLINE', 9, 3],
-  ['Максим', 'Григорьев', 'Терапевт', 'Москва', 5, 'Клиника «Здоровье», онлайн', 'Онлайн-консультация', 'ONLINE', 22, 4],
-  ['Светлана', 'Комарова', 'Кардиолог', 'Санкт-Петербург', 12, 'Сердечно-сосудистый центр', '310', 'OFFLINE', 56, 5],
+const FIRST_NAMES = [
+  'Иван',
+  'Мария',
+  'Дмитрий',
+  'Ольга',
+  'Сергей',
+  'Анна',
+  'Павел',
+  'Татьяна',
+  'Андрей',
+  'Елена',
+  'Максим',
+  'Светлана',
+  'Никита',
+  'Дарья',
+  'Илья',
+  'Полина',
+  'Константин',
+  'Вероника',
+  'Алексей',
+  'Екатерина',
 ];
 
-/** Уникальное время слота для пары (врач), чтобы не нарушить индекс. */
-function nextSlotStart(doctorId, future, perDoctorSeq) {
+const SURNAME_STEMS = [
+  'Иванов',
+  'Петров',
+  'Сидоров',
+  'Кузнецов',
+  'Смирнов',
+  'Попов',
+  'Соколов',
+  'Лебедев',
+  'Козлов',
+  'Новиков',
+];
+
+/** Число записей на пациента: от 2 до 5 (детерминированно). */
+function appointmentCountForPatientIndex(idx) {
+  return 2 + ((idx * 17 + 11) % 4);
+}
+
+/** Уникальный startTime на пару (врач): индекс слота по этому врачу. */
+function nextSlotStart(doctorId, perDoctorSeq) {
   const n = perDoctorSeq.get(doctorId) || 0;
   perDoctorSeq.set(doctorId, n + 1);
-  const stepMs = 50 * 60 * 1000;
-  if (future) {
-    return new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + n * stepMs);
+  const stepMs = 45 * 60 * 1000;
+  return new Date(MAY_2026_START_MS + n * stepMs);
+}
+
+async function deleteDemoAppointments(client) {
+  const { rows } = await client.query(`
+    SELECT a."slotId" AS sid
+    FROM appointments a
+    INNER JOIN users u ON u.id = a."patientId"
+    WHERE u.email ~ $1
+  `, ['^patient[0-9]{2}@demo\\.local$']);
+  const slotIds = [...new Set(rows.map((r) => r.sid).filter(Boolean))];
+  const delAppt = await client.query(`
+    DELETE FROM appointments a
+    USING users u
+    WHERE a."patientId" = u.id AND u.email ~ $1
+  `, ['^patient[0-9]{2}@demo\\.local$']);
+  if (slotIds.length) {
+    await client.query(`DELETE FROM schedule_slots WHERE id = ANY($1::uuid[])`, [slotIds]);
   }
-  return new Date(Date.now() - 40 * 24 * 60 * 60 * 1000 - n * stepMs);
+  console.log(
+    'removed demo appointments:',
+    delAppt.rowCount,
+    'schedule_slots:',
+    slotIds.length,
+  );
 }
 
 async function insertConfirmedAppointment(client, patientId, doctorId, startTime, endTime) {
@@ -79,53 +152,6 @@ async function insertConfirmedAppointment(client, patientId, doctorId, startTime
      VALUES ($1, $2, $3, $4, 'CONFIRMED', 'IN_PERSON', NULL, NOW(), NULL)`,
     [apptId, patientId, doctorId, slotId],
   );
-}
-
-async function seedDemoAppointments(client) {
-  const { rows: users } = await client.query(
-    `SELECT id FROM users WHERE email LIKE 'patient%@demo.local' ORDER BY email`,
-  );
-  const { rows: doctors } = await client.query(`SELECT id FROM doctors ORDER BY surname`);
-  if (!users.length || !doctors.length) {
-    console.log('skip demo appointments: no users or doctors');
-    return;
-  }
-
-  const doctorIds = doctors.map((d) => d.id);
-  const perDoctorSeq = new Map();
-
-  const { rows: existing } = await client.query(
-    `SELECT COUNT(*)::int AS c FROM appointments a
-     INNER JOIN users u ON u.id = a."patientId"
-     WHERE u.email LIKE 'patient%@demo.local'`,
-  );
-  if (existing[0].c > 0) {
-    console.log('skip demo appointments: already have', existing[0].c, 'rows for demo patients');
-    await syncPatientAndDoctorStats(client);
-    return;
-  }
-
-  for (let idx = 0; idx < users.length; idx++) {
-    const patientId = users[idx].id;
-    const pastN = 1 + (idx % 4);
-    const upN = idx % 4;
-
-    for (let p = 0; p < pastN; p++) {
-      const doctorId = doctorIds[(idx + p) % doctorIds.length];
-      const start = nextSlotStart(doctorId, false, perDoctorSeq);
-      const end = new Date(start.getTime() + 30 * 60 * 1000);
-      await insertConfirmedAppointment(client, patientId, doctorId, start, end);
-    }
-    for (let u = 0; u < upN; u++) {
-      const doctorId = doctorIds[(idx + pastN + u) % doctorIds.length];
-      const start = nextSlotStart(doctorId, true, perDoctorSeq);
-      const end = new Date(start.getTime() + 30 * 60 * 1000);
-      await insertConfirmedAppointment(client, patientId, doctorId, start, end);
-    }
-  }
-
-  console.log('demo appointments inserted for', users.length, 'patients');
-  await syncPatientAndDoctorStats(client);
 }
 
 async function syncPatientAndDoctorStats(client) {
@@ -153,6 +179,61 @@ async function syncPatientAndDoctorStats(client) {
   console.log('synced user stats (totalVisits / upcomingVisits) and doctor visitCount');
 }
 
+async function seedDemoAppointments(client) {
+  const { rows: users } = await client.query(
+    `SELECT id FROM users WHERE email ~ $1 ORDER BY email`,
+    ['^patient[0-9]{2}@demo\\.local$'],
+  );
+  const { rows: doctors } = await client.query(`SELECT id FROM doctors ORDER BY surname, name`);
+  if (!users.length || !doctors.length) {
+    console.log('skip demo appointments: no users or doctors');
+    return;
+  }
+
+  const doctorIds = doctors.map((d) => d.id);
+  const perDoctorSeq = new Map();
+
+  await deleteDemoAppointments(client);
+
+  for (let idx = 0; idx < users.length; idx++) {
+    const patientId = users[idx].id;
+    const nAppts = appointmentCountForPatientIndex(idx);
+    for (let a = 0; a < nAppts; a++) {
+      const doctorId = doctorIds[(idx * 3 + a * 7) % doctorIds.length];
+      const start = nextSlotStart(doctorId, perDoctorSeq);
+      const end = new Date(start.getTime() + 30 * 60 * 1000);
+      await insertConfirmedAppointment(client, patientId, doctorId, start, end);
+    }
+  }
+
+  console.log(
+    'demo appointments inserted for',
+    users.length,
+    'patients (2–5 appointments each, May 2026)',
+  );
+  await syncPatientAndDoctorStats(client);
+}
+
+function buildDoctors40() {
+  const rows = [];
+  for (let i = 0; i < 40; i++) {
+    const fn = FIRST_NAMES[i % FIRST_NAMES.length];
+    const sn = `${SURNAME_STEMS[i % SURNAME_STEMS.length]}${Math.floor(i / 10) || ''}`;
+    const spec = SPECIALIZATION_NAMES[i % SPECIALIZATION_NAMES.length];
+    const city = CITIES[i % CITIES.length];
+    const years = 5 + (i % 20);
+    const clinic = `Клиника демо №${1 + (i % 6)}, каб. ${10 + (i % 90)}`;
+    const cabinet = String(100 + i);
+    const presence = i % 3 === 0 ? 'ONLINE' : 'OFFLINE';
+    const visitCount = 0;
+    const ratingStars = 3 + (i % 3);
+    rows.push([fn, sn, spec, city, years, clinic, cabinet, presence, visitCount, ratingStars]);
+  }
+  return rows;
+}
+
+const DOCTORS = buildDoctors40();
+
 async function main() {
   const client = new Client(DB);
   await client.connect();
@@ -178,13 +259,17 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(USER_PASSWORD, 10);
 
-  for (const [name, surname, email, phone] of PATIENTS) {
+  for (let i = 1; i <= 20; i++) {
+    const email = `patient${String(i).padStart(2, '0')}@demo.local`;
     const ex = await client.query('SELECT id FROM users WHERE email = $1', [email]);
     if (ex.rows.length) {
       console.log('skip user', email);
       continue;
     }
     const id = randomUUID();
+    const name = FIRST_NAMES[(i - 1) % FIRST_NAMES.length];
+    const surname = `${SURNAME_STEMS[(i - 1) % SURNAME_STEMS.length]}${i}`;
+    const phone = `+79002${String(i).padStart(6, '0')}`;
     await client.query(
       `INSERT INTO users (id, email, "passwordHash", name, surname, phone, role, "refreshTokenHash", "lastSeenAt", "totalVisits", "upcomingVisits", "createdAt")
        VALUES ($1, $2, $3, $4, $5, $6, 'patient', NULL, NULL, 0, 0, NOW())`,
@@ -234,10 +319,13 @@ async function main() {
 
   await seedDemoAppointments(client);
 
-  const uc = await client.query('SELECT COUNT(*)::int AS c FROM users');
+  const uc = await client.query(
+    `SELECT COUNT(*)::int AS c FROM users WHERE email ~ $1`,
+    ['^patient[0-9]{2}@demo\\.local$'],
+  );
   const dc = await client.query('SELECT COUNT(*)::int AS c FROM doctors');
-  console.log('totals users:', uc.rows[0].c, 'doctors:', dc.rows[0].c);
-  console.log('Все пациенты логинятся с паролем:', USER_PASSWORD);
+  console.log('totals demo patients:', uc.rows[0].c, 'doctors:', dc.rows[0].c);
+  console.log('Демо-пациенты логинятся с паролем:', USER_PASSWORD);
 
   await client.end();
 }
